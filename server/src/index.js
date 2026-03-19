@@ -47,6 +47,15 @@ app.use('/api/fixtures', fixturesRouter);
 app.use('/api/odds', oddsRouter);
 app.use('/api/analysis', analysisRouter);
 
+// Serve React client (built files)
+const clientBuild = path.join(__dirname, '../../client/dist');
+if (require('fs').existsSync(clientBuild)) {
+  app.use(express.static(clientBuild));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientBuild, 'index.html'));
+  });
+}
+
 // Socket.io connections
 io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id}`);
