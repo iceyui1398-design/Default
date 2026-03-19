@@ -10,6 +10,11 @@ const {
 } = require('./apiFootball');
 const { fetchAllSoccerOdds, parseOddsForMatch } = require('./oddsApi');
 const {
+  generateAndSaveFixtures,
+  generateAndSaveMatchDetails,
+  generateOddsForFixtures,
+} = require('./claudeDataService');
+const {
   saveFixtures,
   getFixtures,
   saveLiveMatch,
@@ -102,7 +107,19 @@ async function pollLiveMatches() {
 }
 
 async function pollOdds() {
-  if (!process.env.ODDS_API_KEY || process.env.ODDS_API_KEY === 'your_odds_api_key_here') {
+  const hasOddsApi = process.env.ODDS_API_KEY && process.env.ODDS_API_KEY !== 'your_odds_api_key_here';
+
+  if (!hasOddsApi) {
+    // Use Claude to generate odds for current fixtures
+    const fixtures = getFixtures();
+    const upcoming = fixtures.filter(f => {
+      const matchDate = new Date(f.fixture?.date);
+      return matchDate > new Date();
+    });
+    if (upcoming.length > 0) {
+      await generateOddsForFixtures(upcoming);
+      emitLiveUpdate('odds_updated', { count: upcoming.length, timestamp: new Date().toISOString() });
+    }
     return;
   }
 
@@ -147,7 +164,15 @@ async function pollOdds() {
 }
 
 async function fetchFixturesJob() {
-  if (!process.env.RAPIDAPI_KEY || process.env.RAPIDAPI_KEY === 'your_rapidapi_key_here') {
+  const hasRapidApi = process.env.RAPIDAPI_KEY && process.env.RAPIDAPI_KEY !== 'your_rapidapi_key_here';
+
+  if (!hasRapidApi) {
+    // Use Claude to generate fixtures
+    const fixtures = await generateAndSaveFixtures(3);
+    if (fixtures.length > 0) {
+      saveFixtures(fixtures);
+      emitLiveUpdate('fixtures_updated', { count: fixtures.length });
+    }
     return;
   }
 
@@ -164,7 +189,11 @@ async function fetchFixturesJob() {
 }
 
 async function fetchMatchDetails(fixture) {
-  if (!process.env.RAPIDAPI_KEY || process.env.RAPIDAPI_KEY === 'your_rapidapi_key_here') {
+  const hasRapidApi = process.env.RAPIDAPI_KEY && process.env.RAPIDAPI_KEY !== 'your_rapidapi_key_here';
+
+  if (!hasRapidApi) {
+    // Use Claude to generate H2H, form, injuries, and odds
+    await generateAndSaveMatchDetails(fixture);
     return;
   }
 

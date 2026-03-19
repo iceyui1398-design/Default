@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { getAllOdds, saveOdds } = require('../db/database');
+const { getAllOdds, saveOdds, getFixtures } = require('../db/database');
 const { fetchAllSoccerOdds, parseOddsForMatch } = require('../services/oddsApi');
+const { generateOddsForFixtures } = require('../services/claudeDataService');
 
 // GET /api/odds - Get all cached odds
 router.get('/', (req, res) => {
@@ -16,11 +17,13 @@ router.get('/', (req, res) => {
 // POST /api/odds/refresh - Force refresh odds
 router.post('/refresh', async (req, res) => {
   try {
-    if (!process.env.ODDS_API_KEY || process.env.ODDS_API_KEY === 'your_odds_api_key_here') {
-      return res.status(400).json({
-        success: false,
-        error: 'Odds API key not configured',
-      });
+    const hasOddsApi = process.env.ODDS_API_KEY && process.env.ODDS_API_KEY !== 'your_odds_api_key_here';
+
+    if (!hasOddsApi) {
+      // Use Claude to generate odds for upcoming fixtures
+      const fixtures = getFixtures().filter(f => new Date(f.fixture?.date) > new Date());
+      await generateOddsForFixtures(fixtures);
+      return res.json({ success: true, message: `Generated odds for ${fixtures.length} upcoming matches using AI` });
     }
 
     const allOdds = await fetchAllSoccerOdds();
